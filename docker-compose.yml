@@ -1,0 +1,24 @@
+# Ollama в контейнере, если не хочется ставить её в систему.
+#   docker compose up -d
+#   docker compose exec ollama ollama pull qwen2.5:3b
+#   docker compose exec ollama ollama pull qwen2.5:7b
+# Для NVIDIA GPU раскомментируйте блок deploy (нужен nvidia-container-toolkit).
+services:
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    environment:
+      - OLLAMA_CONTEXT_LENGTH=8192
+    volumes:
+      - ollama:/root/.ollama
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+
+volumes:
+  ollama:

@@ -1,0 +1,139 @@
+{
+  "metrics": {
+    "mode": "ollama: qwen2.5:3b → qwen2.5:7b",
+    "mentions_total": 4,
+    "prefilter_dropped": 1,
+    "drop_reasons": {
+      "spam": 1
+    },
+    "closed_by_cheap_model": 1,
+    "escalated_to_strong_model": 2,
+    "needs_human_review": 1,
+    "cheap": {
+      "calls": 3,
+      "tokens": 1118,
+      "latency_ms": 21075,
+      "cost_usd": 0.0
+    },
+    "strong": {
+      "calls": 6,
+      "tokens": 5061,
+      "latency_ms": 261561,
+      "cost_usd": 0.0
+    },
+    "cost_usd": 0.0,
+    "cost_without_cascade_usd": 0.0,
+    "savings_pct": 0.0,
+    "time_ms": 282636,
+    "time_without_cascade_ms": 697495,
+    "time_savings_pct": 59.5
+  },
+  "results": [
+    {
+      "mention_id": "m02",
+      "stage": "triaged_low",
+      "drop_reason": null,
+      "triage": {
+        "relevant": true,
+        "sentiment": "positive",
+        "severity": "low",
+        "topic": "praise",
+        "confidence": 0.9
+      },
+      "plan": null,
+      "needs_human_review": false,
+      "review_reasons": [],
+      "tool_calls": []
+    },
+    {
+      "mention_id": "m03",
+      "stage": "planned",
+      "drop_reason": null,
+      "triage": {
+        "relevant": true,
+        "sentiment": "negative",
+        "severity": "high",
+        "topic": "payment",
+        "confidence": 0.9
+      },
+      "plan": {
+        "summary": "Клиент жалуется на двойное списание денег за один заказ и отсутствие ответа от поддержки.",
+        "playbook_section": "payment",
+        "steps": [
+          {
+            "action": "Связаться с клиентом для уточнения деталей и возврата средств",
+            "owner": "support",
+            "deadline_hours": 24
+          }
+        ],
+        "reply_draft": null,
+        "evidence": [
+          "ВкусДоставка списала деньги дважды за один заказ, поддержка молчит уже второй день. Верните деньги!"
+        ],
+        "confidence": 0.8
+      },
+      "needs_human_review": false,
+      "review_reasons": [],
+      "tool_calls": [
+        "get_playbook({\"section\": \"payment\"})",
+        "search_related_mentions({\"query\": \"ВкусДоставка списала деньги дважды\"})"
+      ]
+    },
+    {
+      "mention_id": "m04",
+      "stage": "prefilter_dropped",
+      "drop_reason": "spam",
+      "triage": null,
+      "plan": null,
+      "needs_human_review": false,
+      "review_reasons": [],
+      "tool_calls": []
+    },
+    {
+      "mention_id": "m06",
+      "stage": "planned",
+      "drop_reason": null,
+      "triage": {
+        "relevant": true,
+        "sentiment": "negative",
+        "severity": "high",
+        "topic": "data_leak",
+        "confidence": 0.9
+      },
+      "plan": {
+        "summary": "В сети появилась информация о возможной утечке данных с базой телефонов и адресов клиентов ВкусДоставка.",
+        "playbook_section": "data_leak",
+        "steps": [
+          {
+            "action": "Немедленно уведомить службу безопасности.",
+            "owner": "support",
+            "deadline_hours": 1
+          },
+          {
+            "action": "Верифицировать информацию.",
+            "owner": "legal",
+            "deadline_hours": 8
+          },
+          {
+            "action": "Подготовить публичное заявление.",
+            "owner": "pr",
+            "deadline_hours": 8
+          }
+        ],
+        "reply_draft": "Мы внимательно проверяем информацию о возможной утечке данных и приносим извинения, если это подтвердится. В данный момент мы не можем комментировать.",
+        "evidence": [
+          "Похоже, у ВкусДоставка утечка данных: в открытом доступе лежит база с телефонами и адресами клиентов."
+        ],
+        "confidence": 0.8
+      },
+      "needs_human_review": true,
+      "review_reasons": [
+        "policy_requires_review"
+      ],
+      "tool_calls": [
+        "get_playbook({\"section\": \"data_leak\"})",
+        "search_related_mentions({\"query\": \"ВкусДоставка утечка данных\"})"
+      ]
+    }
+  ]
+}
