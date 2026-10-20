@@ -1,4 +1,3 @@
-"""Прогон пачки упоминаний через каскад и сбор метрик."""
 from collections import Counter
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -17,7 +16,7 @@ class BatchReport:
     metrics: dict
 
 
-ProgressFn = Callable[[str, str, dict], None]  # (id упоминания, узел графа, обновление состояния)
+ProgressFn = Callable[[str, str, dict], None]
 
 
 def run_batch(mentions: list[Mention], settings: Settings | None = None,
@@ -44,7 +43,7 @@ def run_batch(mentions: list[Mention], settings: Settings | None = None,
             elif on_progress:
                 for node, update in chunk.items():
                     on_progress(m.id, node, update or {})
-        planned = "review_reasons" in state  # узел review выполняется только на ветке плана
+        planned = "review_reasons" in state
         reasons = state.get("review_reasons") or []
         results.append(MentionResult(
             mention_id=m.id,
@@ -68,13 +67,10 @@ def _metrics(results: list[MentionResult], tracker: UsageTracker, s: Settings, t
     cost_strong = tracker.cost(s, "strong")
     planned = stages["planned"]
 
-    # Оценка «без каскада»: каждое упоминание (даже мусор) проходит весь путь на сильной модели.
     strong_per_planned = cost_strong / planned if planned else 0.0
     baseline = tracker.cost(s, "cheap", as_tier="strong") * total / max(cheap.calls, 1) + strong_per_planned * total
     actual = cost_cheap + cost_strong
 
-    # Та же оценка по времени: локально деньги не тратятся, а время сильной модели — да.
-    # Без каскада каждое упоминание триажит сильная модель (≈ один её средний вызов) и проходит весь путь.
     strong_call_ms = strong.latency_ms / strong.calls if strong.calls else 0.0
     strong_ms_per_planned = strong.latency_ms / planned if planned else 0.0
     time_baseline = (strong_call_ms + strong_ms_per_planned) * total

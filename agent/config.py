@@ -1,24 +1,16 @@
-"""Настройки из переменных окружения.
-
-LLM_PROVIDER выбирает, где работают модели:
-  ollama — локально через OpenAI-совместимый эндпоинт Ollama (по умолчанию, бесплатно);
-  openai — любой внешний OpenAI-совместимый API (OpenAI, OpenRouter, vLLM, ...);
-  fake   — детерминированная офлайн-модель для тестов и демо без моделей.
-"""
 import os
 from dataclasses import dataclass
 from typing import Literal
 
 Provider = Literal["ollama", "openai", "fake"]
 
-# Значения по умолчанию для каждого провайдера. Всё переопределяется переменными окружения.
 _DEFAULTS = {
     "ollama": {
         "base_url": "http://localhost:11434/v1",
         "cheap_model": "qwen2.5:3b",
         "strong_model": "qwen2.5:7b",
-        "prices": ("0", "0", "0", "0"),  # локально токены бесплатны
-        "timeout": "300",  # на CPU ответ сильной модели может идти минуту и дольше
+        "prices": ("0", "0", "0", "0"),
+        "timeout": "300",
     },
     "openai": {
         "base_url": "",
@@ -37,15 +29,14 @@ class Settings:
     base_url: str | None
     cheap_model: str
     strong_model: str
-    # Цены за 1M токенов (вход / выход) — только для оценки стоимости в отчёте.
     cheap_price_in: float
     cheap_price_out: float
     strong_price_in: float
     strong_price_out: float
-    review_threshold: float  # ниже этой уверенности — ручная проверка
-    max_tool_steps: int  # защита от бесконечного цикла tool-calling
-    timeout: float  # секунд на один запрос к модели
-    fake_llm: bool  # офлайн-режим без моделей (детерминированная модель)
+    review_threshold: float
+    max_tool_steps: int
+    timeout: float
+    fake_llm: bool
 
     @property
     def is_local(self) -> bool:
@@ -61,13 +52,12 @@ def load_settings() -> Settings:
 
     api_key = os.getenv("OPENAI_API_KEY")
     if provider == "openai" and not api_key:
-        provider = "fake"  # без ключа внешний API недоступен — работаем офлайн
+        provider = "fake"
 
     d = _DEFAULTS["openai" if provider == "openai" else "ollama"]
     p_ci, p_co, p_si, p_so = d["prices"]
     return Settings(
         provider=provider,
-        # Ollama ключ не проверяет, но клиент OpenAI требует непустое значение.
         api_key=api_key if provider == "openai" else "ollama",
         base_url=os.getenv("OPENAI_BASE_URL") or os.getenv("OLLAMA_BASE_URL") or d["base_url"] or None,
         cheap_model=os.getenv("CHEAP_MODEL", d["cheap_model"]),

@@ -1,7 +1,3 @@
-"""Локальный режим: настройки Ollama и разбор ответов небольших моделей.
-
-Вместо настоящей Ollama поднимается HTTP-заглушка с её OpenAI-совместимым API,
-поэтому тесты проверяют весь путь через клиент OpenAI без скачивания моделей."""
 import json
 import threading
 from dataclasses import replace
@@ -26,8 +22,6 @@ TRIAGE = {"relevant": True, "sentiment": "negative", "severity": "high", "topic"
 
 
 class FakeOllama(BaseHTTPRequestHandler):
-    """Отвечает так, как это делают небольшие модели: JSON в ```-блоке и вызов инструмента текстом."""
-
     models = ["qwen2.5:3b", "qwen2.5:7b"]
     requests: list[dict] = []
 
@@ -108,8 +102,8 @@ def test_full_pipeline_through_ollama_api(ollama_settings):
     r = run_batch([m], ollama_settings, llm).results[0]
 
     assert r.stage == "planned"
-    assert r.triage.topic == "payment"  # JSON достали из ```-блока
-    assert r.tool_calls == ['get_playbook({"section": "payment"})']  # вызов инструмента из текста
+    assert r.triage.topic == "payment"
+    assert r.tool_calls == ['get_playbook({"section": "payment"})']
     assert r.plan.playbook_section == "payment" and not r.needs_human_review
     used = {req["model"] for req in FakeOllama.requests}
     assert used == {"qwen2.5:3b", "qwen2.5:7b"}
@@ -134,4 +128,4 @@ def test_schema_echo_with_values_is_unwrapped():
     echo = '{"title": "Triage", "type": "object", "properties": {"relevant": true, "confidence": 0.9}}'
     assert json.loads(unwrap_schema_echo(echo)) == {"relevant": True, "confidence": 0.9}
     schema = '{"type": "object", "properties": {"relevant": {"type": "boolean"}}}'
-    assert unwrap_schema_echo(schema) == schema  # чистую схему не трогаем — её отклонит валидация
+    assert unwrap_schema_echo(schema) == schema

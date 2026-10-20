@@ -1,9 +1,3 @@
-"""Запуск из терминала.
-
-    python cli.py                      # прогон data/mentions.json
-    python cli.py --file my.json       # свой файл
-    python cli.py --json               # полный вывод в JSON
-"""
 import argparse
 import json
 import sys
@@ -22,7 +16,6 @@ STAGE_LABEL = {
 
 
 def warmup(settings, keep_alive: str = "30m") -> None:
-    """Загружает модели в память Ollama заранее, чтобы на показе не было холодного старта."""
     import time
     import urllib.request
 
@@ -41,7 +34,6 @@ def warmup(settings, keep_alive: str = "30m") -> None:
 
 
 def print_progress(mention_id: str, node: str, update: dict) -> None:
-    """Ход обработки в stderr, чтобы не мешать выводу --json."""
     if node == "prefilter":
         msg = f"отсеяно правилами ({update['drop_reason']})"
     elif node == "triage":
@@ -52,7 +44,7 @@ def print_progress(mention_id: str, node: str, update: dict) -> None:
         msg = "сильная модель вызывает: " + ", ".join(c.name for c in calls) if calls else "сильная модель: факты собраны"
     elif node == "ensure_playbook":
         if not update:
-            return  # модель сама вызвала get_playbook
+            return
         msg = "плейбук подтянут автоматически"
     elif node == "tools":
         msg = "инструменты выполнены"

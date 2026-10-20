@@ -1,7 +1,3 @@
-"""Нулевой уровень каскада: бесплатные детерминированные правила, без LLM.
-
-Отсекает дубли, спам, слишком короткие тексты и упоминания не про бренд.
-"""
 import hashlib
 import re
 
@@ -16,7 +12,6 @@ def _normalize(text: str) -> str:
 
 
 def prefilter(mentions: list[Mention], aliases: list[str]) -> tuple[list[Mention], dict[str, str]]:
-    """Возвращает (прошедшие, {id: причина отсева})."""
     kept: list[Mention] = []
     dropped: dict[str, str] = {}
     seen: set[str] = set()

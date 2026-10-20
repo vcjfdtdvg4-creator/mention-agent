@@ -1,9 +1,3 @@
-"""Инструменты агента.
-
-У каждого инструмента: строгая схема аргументов (Pydantic), описание для модели
-в формате OpenAI tools и функция-исполнитель. Аргументы от модели валидируются
-до выполнения — модель не может вызвать инструмент с мусором.
-"""
 import json
 from dataclasses import dataclass
 from pathlib import Path
@@ -22,14 +16,10 @@ def load_json(name: str):
 
 @dataclass
 class ToolContext:
-    """Данные, к которым у инструментов есть доступ (только чтение)."""
-
     mentions: list[Mention]
     company: dict
     playbook: dict
 
-
-# ---------- аргументы ----------
 
 class SearchArgs(BaseModel):
     query: str = Field(min_length=2, description="Ключевые слова: район, продукт, тип проблемы")
@@ -44,10 +34,7 @@ class NoArgs(BaseModel):
     pass
 
 
-# ---------- реализации ----------
-
 def search_related_mentions(ctx: ToolContext, args: SearchArgs) -> dict:
-    """Ищет похожие упоминания — помогает понять, единичный это случай или волна."""
     words = [w.lower() for w in args.query.split() if len(w) > 2]
     hits = [m for m in ctx.mentions if any(w in m.text.lower() for w in words)]
     return {
@@ -103,8 +90,6 @@ TOOLS: dict[str, Tool] = {
 
 
 def execute_tool(ctx: ToolContext, name: str, raw_args: dict) -> dict:
-    """Безопасное выполнение: неизвестный инструмент или кривые аргументы
-    возвращаются модели как ошибка, а не роняют граф."""
     tool = TOOLS.get(name)
     if tool is None:
         return {"error": f"Неизвестный инструмент '{name}'", "available": list(TOOLS)}

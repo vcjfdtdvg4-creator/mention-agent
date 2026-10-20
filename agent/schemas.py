@@ -1,4 +1,3 @@
-"""Строгие схемы данных. Всё, что возвращает LLM, проходит через эти модели."""
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -19,8 +18,6 @@ class Mention(BaseModel):
 
 
 class Triage(BaseModel):
-    """Ответ дешёвой модели: быстрая сортировка упоминания."""
-
     relevant: bool = Field(description="Касается ли упоминание бренда")
     sentiment: Sentiment
     severity: Severity = Field(description="Насколько срочно нужна реакция")
@@ -35,8 +32,6 @@ class ActionStep(BaseModel):
 
 
 class ActionPlan(BaseModel):
-    """Ответ сильной модели: план реакции с опорой на плейбук."""
-
     summary: str = Field(min_length=10, description="Суть проблемы в 1–2 предложениях")
     playbook_section: str = Field(description="Ключ раздела плейбука, на который опирается план")
     steps: list[ActionStep] = Field(min_length=1, max_length=6)

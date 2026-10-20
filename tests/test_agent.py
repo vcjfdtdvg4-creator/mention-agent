@@ -1,4 +1,3 @@
-"""Тесты гарантий агента. Работают офлайн на FakeLLM, без моделей."""
 import json
 from dataclasses import replace
 
@@ -11,7 +10,6 @@ from agent.tools import ToolContext, execute_tool, load_json
 
 
 def settings():
-    # Цены API нужны только для проверки оценки стоимости каскада.
     return replace(load_settings(), provider="fake", fake_llm=True, cheap_price_in=0.15, cheap_price_out=0.6,
                    strong_price_in=2.5, strong_price_out=10.0)
 
@@ -73,8 +71,6 @@ def test_plan_invalid_twice_goes_to_human_review():
 
 
 class LoopingLLM(FakeLLM):
-    """Модель, которая бесконечно хочет вызывать инструменты."""
-
     def _call(self, tier, messages, tools, json_mode):
         if "[TASK:INVESTIGATE]" in messages[0]["content"]:
             return LLMReply(None, [ToolCall(self._id(), "get_company_facts", {})], 10, 10, 1.0)

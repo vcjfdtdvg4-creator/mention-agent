@@ -1,13 +1,3 @@
-"""Граф агента на LangGraph.
-
-    START → triage (дешёвая модель)
-              ├─ нерелевантно / низкая важность и модель уверена → END
-              └─ иначе → investigate (сильная модель + tool-calling)
-                            ⇄ tools (цикл, не больше MAX_TOOL_STEPS шагов)
-                            → ensure_playbook (правило: без плейбука план не строим)
-                            → plan (сильная модель, structured output + валидация + 1 ретрай)
-                            → review (правила: нужна ли ручная проверка) → END
-"""
 import json
 from typing import TypedDict
 
@@ -65,7 +55,6 @@ class AgentState(TypedDict, total=False):
 def build_graph(llm: BaseLLM, ctx: ToolContext, settings: Settings):
     playbook_keys = set(ctx.playbook)
 
-    # ---------- узлы ----------
 
     def triage(state: AgentState) -> dict:
         m = state["mention"]
@@ -106,7 +95,6 @@ def build_graph(llm: BaseLLM, ctx: ToolContext, settings: Settings):
                 "tool_results": results, "tool_steps": state.get("tool_steps", 0) + 1}
 
     def ensure_playbook(state: AgentState) -> dict:
-        """План всегда опирается на плейбук: если модель не вызвала get_playbook, вызываем его сами по теме триажа."""
         results = state.get("tool_results") or []
         if any(r["tool"] == "get_playbook" for r in results):
             return {}
@@ -133,7 +121,6 @@ def build_graph(llm: BaseLLM, ctx: ToolContext, settings: Settings):
             {"role": "system", "content": PLAN_SYSTEM.format()},
             {"role": "user", "content": user},
         ]
-        # Первая попытка + один ретрай с текстом ошибки валидации.
         for attempt in range(2):
             reply = llm.chat("strong", messages, json_mode=True)
             try:
@@ -160,27 +147,26 @@ def build_graph(llm: BaseLLM, ctx: ToolContext, settings: Settings):
         topic = (p.playbook_section if p else None) or (t.topic if t else None)
         if topic in ALWAYS_REVIEW_TOPICS:
             reasons.append("policy_requires_review")
-        if state.get("pending_calls"):  # модель ещё хотела инструменты, но лимит шагов исчерпан
+        if state.get("pending_calls"):
             reasons.append("tool_limit_reached")
         return {"review_reasons": reasons}
 
-    # ---------- маршрутизация ----------
 
     def after_triage(state: AgentState) -> str:
         t = state.get("triage")
         if t is None:
-            return "investigate"  # не смогли разобрать — безопаснее эскалировать
+            return "investigate"
         if not t.relevant:
             return "done"
         if t.severity == "low" and t.confidence >= settings.review_threshold:
-            return "done"  # дешёвая модель уверена, что реагировать не нужно
-        return "investigate"  # важно или модель не уверена → сильная модель
+            return "done"
+        return "investigate"
 
     def after_investigate(state: AgentState) -> str:
         if not state.get("pending_calls"):
             return "plan"
         if state.get("tool_steps", 0) >= settings.max_tool_steps:
-            return "plan"  # защита от зацикливания; review отметит это
+            return "plan"
         return "tools"
 
     g = StateGraph(AgentState)

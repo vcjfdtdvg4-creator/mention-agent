@@ -1,8 +1,3 @@
-"""LLM-клиент с двумя уровнями моделей (cheap / strong) и учётом токенов.
-
-OpenAILLM — работает с любым OpenAI-совместимым API, включая локальную Ollama.
-FakeLLM   — детерминированная офлайн-модель: для тестов и запуска без моделей.
-"""
 import json
 import re
 import time
@@ -28,7 +23,7 @@ class LLMReply:
     tool_calls: list[ToolCall] = field(default_factory=list)
     prompt_tokens: int = 0
     completion_tokens: int = 0
-    latency_ms: float | None = None  # FakeLLM задаёт смоделированную задержку
+    latency_ms: float | None = None
 
 
 @dataclass
@@ -51,7 +46,6 @@ class UsageTracker:
         s.latency_ms += latency_ms
 
     def cost(self, settings: Settings, tier: Tier, as_tier: Tier | None = None) -> float:
-        """Стоимость в $. as_tier — посчитать токены этого уровня по ценам другого."""
         s = self.stats[tier]
         price = as_tier or tier
         p_in = settings.cheap_price_in if price == "cheap" else settings.strong_price_in
@@ -60,7 +54,6 @@ class UsageTracker:
 
 
 def assistant_message(reply: LLMReply) -> dict:
-    """Сообщение ассистента в формате OpenAI (нужно, чтобы вернуть модели результаты инструментов)."""
     msg: dict = {"role": "assistant", "content": reply.content}
     if reply.tool_calls:
         msg["tool_calls"] = [
@@ -84,24 +77,18 @@ class BaseLLM:
         self.tracker.record(tier, reply, latency)
         return reply
 
-    def _call(self, tier, messages, tools, json_mode) -> LLMReply:  # pragma: no cover
+    def _call(self, tier, messages, tools, json_mode) -> LLMReply:
         raise NotImplementedError
 
 
 class LLMUnavailable(RuntimeError):
-    """Модель недоступна: сервер не запущен или модель не скачана."""
+    pass
 
 
 _FENCE = re.compile(r"^```(?:json)?\s*(.*?)\s*```$", re.S)
 
 
 def extract_json(text: str | None) -> str | None:
-    """Достаёт JSON-объект из ответа модели.
-
-    Маленькие локальные модели иногда оборачивают JSON в ```json ... ``` или
-    добавляют фразу до/после. Если объект найти не удалось, текст возвращается как есть,
-    и его отклонит валидация Pydantic.
-    """
     if not text:
         return text
     t = text.strip()
@@ -115,9 +102,6 @@ def extract_json(text: str | None) -> str | None:
 
 
 def unwrap_schema_echo(text: str | None) -> str | None:
-    """Маленькие модели иногда повторяют JSON Schema и вписывают значения прямо в "properties":
-    {"title": "Triage", "type": "object", "properties": {"relevant": true, ...}}.
-    Если все значения в properties — данные, а не описания полей, возвращаем их."""
     try:
         data = json.loads(text or "")
     except json.JSONDecodeError:
@@ -130,8 +114,6 @@ def unwrap_schema_echo(text: str | None) -> str | None:
 
 
 def _tool_calls_from_content(content: str | None, tools: list[dict] | None) -> list[ToolCall]:
-    """Небольшие модели порой пишут вызов инструмента текстом, а не в tool_calls:
-    {"name": "get_playbook", "arguments": {...}}. Распознаём только известные инструменты."""
     if not content or not tools:
         return []
     known = {t["function"]["name"] for t in tools}
@@ -159,7 +141,6 @@ class OpenAILLM(BaseLLM):
                              timeout=settings.timeout, max_retries=2)
 
     def check(self) -> None:
-        """Проверка перед прогоном: сервер отвечает и нужные модели на месте."""
         import openai
 
         try:
@@ -168,7 +149,7 @@ class OpenAILLM(BaseLLM):
             hint = " Запустите Ollama: `ollama serve`." if self.settings.is_local else ""
             raise LLMUnavailable(f"Нет связи с {self.settings.base_url}.{hint}") from e
         if not self.settings.is_local:
-            return  # у облачных провайдеров список моделей бывает неполным
+            return
         missing = [m for m in dict.fromkeys([self.settings.cheap_model, self.settings.strong_model])
                    if m not in available and f"{m}:latest" not in available]
         if missing:
@@ -179,16 +160,11 @@ class OpenAILLM(BaseLLM):
         model = self.settings.cheap_model if tier == "cheap" else self.settings.strong_model
         kwargs: dict = {"model": model, "messages": messages, "temperature": 0}
         if self.settings.is_local:
-            kwargs["extra_body"] = {"keep_alive": "30m"}  # модели не выгружаются из памяти между прогонами
+            kwargs["extra_body"] = {"keep_alive": "30m"}
         if tools:
             kwargs["tools"] = tools
-            # Вызов инструмента или короткий итог укладываются в ~100 токенов. Без лимита маленькая модель
-            # иногда «уходит в разговор» на сотни токенов, и Ollama падает с 500 после долгой генерации.
             kwargs["max_tokens"] = 256
         if json_mode and self.settings.is_local:
-            # JSON-грамматика Ollama не даёт модели закончить ответ: после «}» маленькая модель
-            # продолжает печатать пробелы, и Ollama обрывает запрос с 500 (~40 с впустую + ретрай).
-            # Без грамматики модель останавливается сама, а JSON достают extract_json и валидация Pydantic.
             kwargs["max_tokens"] = 700
         elif json_mode:
             kwargs["response_format"] = {"type": "json_object"}
@@ -199,7 +175,7 @@ class OpenAILLM(BaseLLM):
             try:
                 args = json.loads(tc.function.arguments or "{}")
             except json.JSONDecodeError:
-                args = {"_raw": tc.function.arguments}  # инструмент вернёт модели ошибку валидации
+                args = {"_raw": tc.function.arguments}
             calls.append(ToolCall(tc.id, tc.function.name, args))
         content = msg.content
         if not calls:
@@ -216,10 +192,6 @@ class OpenAILLM(BaseLLM):
             completion_tokens=usage.completion_tokens if usage else 0,
         )
 
-
-# ---------------------------------------------------------------------------
-# Офлайн-модель
-# ---------------------------------------------------------------------------
 
 _TOPIC_RULES = [
     ("data_leak", ("утечк",), "negative", "high", 0.9),
@@ -268,12 +240,9 @@ def _field(text: str, name: str) -> str:
 
 
 class FakeLLM(BaseLLM):
-    """Ведёт себя как настоящая модель на уровне протокола: JSON-ответы,
-    tool_calls, учёт токенов. Логика — простые правила по ключевым словам."""
-
     def __init__(self, settings: Settings, tracker: UsageTracker, fail_plan_times: int = 0) -> None:
         super().__init__(settings, tracker)
-        self.fail_plan_times = fail_plan_times  # для тестов: сколько раз вернуть битый план
+        self.fail_plan_times = fail_plan_times
         self._ids = 0
 
     def _call(self, tier, messages, tools, json_mode) -> LLMReply:
@@ -300,7 +269,7 @@ class FakeLLM(BaseLLM):
         if "[TASK:PLAN]" in system:
             if self.fail_plan_times > 0:
                 self.fail_plan_times -= 1
-                content = '{"summary": "коротко", "steps": []}'  # нарушает схему
+                content = '{"summary": "коротко", "steps": []}'
             else:
                 content = json.dumps(self._plan(user), ensure_ascii=False)
             return LLMReply(content, [], prompt_tokens, _tokens(content), latency)
